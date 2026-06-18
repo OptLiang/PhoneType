@@ -253,3 +253,10 @@ android:roundIcon="@mipmap/ic_launcher_round"
 * “退格”“Delete”“方向键”“复制”“剪切”等操作都作用于电脑当前焦点窗口。
 * 使用前请确认电脑当前焦点位于目标输入框中。
 * 本项目适合个人局域网环境使用，不建议暴露到公网。
+
+## 下载
+
+可在 GitHub Releases 页面下载：
+
+- `PhoneType-v1.0.0-debug.apk`：Android 手机端
+- `PhoneTypePC-v1.0.0.zip`：Windows 电脑端监听器
