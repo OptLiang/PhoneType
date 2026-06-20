@@ -1,22 +1,36 @@
 # PhoneType
 
-PhoneType 是一个“手机输入法电脑输入器”。它允许用户在 Android 手机上使用手机输入法输入、预览文本，并通过局域网 TCP 将内容输入到 Windows 电脑当前光标位置。它适合在微信、网页输入框、文档编辑器、聊天窗口等场景中使用手机输入法辅助电脑输入。
+PhoneType 是一个“手机输入法电脑输入器”。用户在 Android 手机上输入和预览文本，应用通过 JSON Lines + TCP 协议把文本或按键请求发送到 Windows 电脑端服务，电脑端再写入剪贴板并模拟键盘输入到当前光标位置。
 
-## 功能特点
+当前版本：v2.0 stable。
 
-* Android 手机端输入文本并预览
-* 一键将手机输入内容输入到电脑当前光标位置
-* 支持中文、英文、emoji、多行文本
-* 支持电脑端 Enter 发送
-* 支持 Shift + Enter 换行
-* 支持远程方向键控制光标移动
-* 支持退格、Delete、全选、复制、剪切、粘贴、撤销
-* 支持 Win + Shift + S 触发 Windows 截图
-* 手机端自动记忆上次电脑 IP 和端口
-* App 启动后自动尝试连接上次电脑地址
-* 电脑端提供 GUI 监听启动器，可双击 `launcher.pyw` 打开
-* 电脑端启动器显示本机 IP、端口和监听状态
-* 无需浏览器插件、无需云服务、无需账号系统
+## 当前支持
+
+PhoneType v2.0 是 LAN + USB 双通道稳定版，当前能力如下：
+
+* LAN TCP 长连接：连接成功后复用同一 TCP socket 连续发送多条 JSON Lines 请求。
+* USB ADB reverse：通过 `adb reverse tcp:8765 tcp:8765`，手机端连接 `127.0.0.1:8765`，仍复用同一 JSON Lines + TCP 协议。
+* Android 手机端输入文本并预览。
+* 输入中文、英文、emoji、多行文本。
+* 输入成功后自动清空手机输入框。
+* Enter 发送。
+* Shift + Enter 换行。
+* 退格、Delete、全选、复制、剪切、粘贴、撤销。
+* Win + Shift + S 触发 Windows 截图。
+* 上下左右方向键。
+* 手机端记忆上次连接方式、局域网 IP 和端口。
+* 启动自动连接：优先尝试上次连接方式，失败后尝试备用 LAN / USB。
+* 最近延迟显示：连接、测试和发送成功后显示最近响应耗时。
+* 手动点击“连接”只连接当前选择模式，不自动切换到另一个模式。
+* 电脑端 tkinter 启动器，可启动/停止服务、显示最近客户端和最近操作。
+* 电脑端启动器可一键配置 USB ADB reverse。
+
+## 当前未支持
+
+* 蓝牙仍未实现：不支持 RFCOMM 和 BLE GATT。
+* Android 原生 USB Host / Accessory。
+* USB / LAN / 蓝牙三模式完整自动切换。
+* 云同步、账号系统、历史记录、剪贴板同步。
 
 ## 项目结构
 
@@ -27,16 +41,13 @@ PhoneType
 │       ├── AndroidManifest.xml
 │       ├── java/com/phonetype
 │       │   ├── MainActivity.kt
+│       │   ├── ConnectionManager.kt
+│       │   ├── ConnectionModels.kt
+│       │   ├── TransportClient.kt
+│       │   ├── LanTcpTransport.kt
+│       │   ├── UsbAdbTransport.kt
 │       │   └── TcpClient.kt
 │       └── res
-│           ├── drawable
-│           ├── mipmap-anydpi-v26
-│           ├── mipmap-hdpi
-│           ├── mipmap-mdpi
-│           ├── mipmap-xhdpi
-│           ├── mipmap-xxhdpi
-│           ├── mipmap-xxxhdpi
-│           └── values
 ├── PhoneTypePC
 │   ├── launcher.py
 │   ├── launcher.pyw
@@ -64,29 +75,14 @@ PhoneType
 * socketserver
 * pyperclip
 * pynput
-
-## 运行环境
-
-### Android 端
-
-* Android Studio
-* Android SDK 35
-* Kotlin 2.0.21
-* Android Gradle Plugin 8.6.1
-* Android 设备和电脑处于同一局域网
-
-### Windows 电脑端
-
-* Windows 10 / Windows 11
-* Python 3.10 或更高版本
-* 局域网环境
+* adb（仅 USB ADB reverse 模式需要）
 
 ## 电脑端使用方法
 
 进入电脑端目录：
 
 ```powershell
-cd (保存位置)\PhoneType\PhoneTypePC
+cd D:\AndroidStudioProjects\PhoneType\PhoneTypePC
 ```
 
 安装依赖：
@@ -101,42 +97,75 @@ pip install -r requirements.txt
 python launcher.py
 ```
 
-也可以直接双击：
+也可以双击：
 
 ```text
 PhoneTypePC\launcher.pyw
 ```
 
-启动后，窗口会显示本机局域网 IP 和端口，例如：
+启动后，窗口会显示本机局域网 IP、端口、服务状态、最近客户端和最近操作。
+
+## LAN TCP 使用步骤
+
+电脑端：
+
+1. 打开 `PhoneTypePC\launcher.pyw` 或运行 `python launcher.py`。
+2. 点击“启动服务”。
+3. 记录窗口显示的本机地址，例如 `192.168.1.8:8765`。
+
+手机端：
+
+1. 打开 PhoneType。
+2. 点击“修改”。
+3. 选择“局域网”。
+4. 输入电脑端显示的 IP 和端口。
+5. 点击“连接”。
+6. 顶部显示“当前连接：局域网 · 已连接 · xx ms”后即可输入。
+
+LAN 模式连接后会复用长连接，连续方向键和快捷键不再每次新建 TCP 连接。
+
+## 自动连接策略
+
+App 启动后会优先尝试上次连接方式：
+
+* 上次使用 USB 数据线时，先尝试 `127.0.0.1:8765`，失败后如果保存过有效 LAN IP 和端口，再尝试 LAN。
+* 上次使用局域网时，先尝试保存的 LAN IP 和端口，失败后再尝试 USB ADB reverse。
+* 两种方式都失败时，App 会展开连接配置区并显示失败原因。
+* 用户手动点击“连接”时只连接当前选择模式，不自动切换到另一个模式。
+
+## 延迟显示
+
+Android 端会在本地统计连接、测试连接和发送请求的耗时，成功后顶部状态显示最近延迟，例如：
 
 ```text
-本机地址：192.168.1.8:8765
-服务状态：后台监听中
+当前连接：局域网 · 已连接 · 23 ms
+当前连接：USB 数据线 · 已连接 · 16 ms
 ```
 
-手机端填写该 IP 和端口后即可连接。
+延迟不由电脑端返回，不修改 JSON 协议字段。
 
-## Android 端使用方法
+## USB ADB reverse 使用步骤
 
-1. 使用 Android Studio 打开项目根目录：
+USB 模式不使用 Android 原生 USB API，也不需要新增 Android 权限。它依赖 adb reverse，把手机端的 `127.0.0.1:8765` 转发到电脑端 `127.0.0.1:8765`。
 
-```text
-(保存位置)\PhoneType
-```
+电脑端：
 
-2. 等待 Gradle Sync 完成。
+1. 手机用 USB 数据线连接电脑。
+2. 手机打开开发者选项和 USB 调试。
+3. 打开 PhoneType PC launcher。
+4. 点击“一键配置 USB 连接”。
+5. 如果手机弹出 USB 调试授权，点击允许。
+6. 确认状态显示“USB 转发已配置，手机端请选择 USB 数据线模式并连接”。
 
-3. 连接 Android 手机。
+手机端：
 
-4. 运行 `app` 到手机。
+1. 打开 PhoneType。
+2. 点击“修改”。
+3. 选择“USB 数据线”。
+4. 点击“连接”。
+5. 顶部显示“当前连接：USB 数据线 · 已连接 · xx ms”后即可输入。
 
-5. 打开 PhoneType App。
-
-6. 如果是第一次使用，输入电脑端显示的 IP 和端口。
-
-7. 点击测试连接。
-
-8. 连接成功后，在输入框输入文本，点击“输入”。
+清除 USB 转发时，可在 launcher 中点击“清除 USB 转发”。
 
 ## 手机端按钮说明
 
@@ -150,11 +179,7 @@ PhoneTypePC\launcher.pyw
 
 ### 方向
 
-打开方向轮盘，用于控制电脑光标上下左右移动。再次点击中心按钮可退出方向模式。
-
-### 换行
-
-发送 Shift + Enter。适合在聊天框中换行而不是发送消息。
+打开方向控制区，用于控制电脑光标上下左右移动。再次点击退出按钮可退出方向模式。
 
 ### 电脑控制
 
@@ -170,15 +195,17 @@ PhoneTypePC\launcher.pyw
 * 撤销
 * 截图
 
+输入法弹出时点击“电脑控制”，App 会先收起输入法并显示电脑控制区。
+
 ## 通信协议
 
-PhoneType 使用局域网 TCP 通信。默认端口：
+默认端口：
 
 ```text
 8765
 ```
 
-通信格式为 JSON Lines，每条消息一行 JSON。
+通信格式为 JSON Lines，每条消息一行 JSON。LAN 和 USB ADB reverse 共用同一协议。
 
 ### 输入文本
 
@@ -204,59 +231,100 @@ PhoneType 使用局域网 TCP 通信。默认端口：
 {"type":"shortcut","keys":["ctrl","c"]}
 ```
 
-## 常见问题
+服务端只接受内置白名单中的 key 和 shortcut，不允许客户端执行任意命令。
 
-### 1. 手机连接失败
-
-请检查：
-
-* 手机和电脑是否连接同一个 Wi-Fi
-* 电脑端 `launcher.pyw` 是否已经启动监听
-* Windows 防火墙是否允许 Python 通信
-* 手机端 IP 是否填写为电脑端显示的局域网 IP
-* 端口是否为 `8765`
-
-### 2. 手机显示连接正常，但电脑没有输入文字
-
-请检查：
-
-* 电脑当前焦点是否在输入框中
-* 是否有安全软件拦截 Python 模拟键盘
-* 是否正在运行多个旧版 `server.py`
-* 电脑端监听器是否显示后台监听中
-
-### 3. 停止服务后手机还能输入
-
-说明 8765 端口上可能仍有旧服务进程。可以在 PowerShell 中检查：
+## Android 本机编译
 
 ```powershell
-netstat -ano | findstr :8765
+cd D:\AndroidStudioProjects\PhoneType
+$env:GRADLE_USER_HOME="$PWD\.gradle-user-home"
+.\gradlew.bat assembleDebug --stacktrace --no-daemon
 ```
 
-如有旧进程，可以通过 PhoneType PC 启动器停止服务，或手动结束对应 PID。
+## 常见问题
 
-### 4. App 图标没有更新
+### 自动连接失败怎么办
 
-请确认 `AndroidManifest.xml` 中包含：
+1. 点“修改”展开连接区。
+2. 手动选择 LAN 或 USB。
+3. 手动连接只连接当前选择模式，不会自动切换到另一个模式。
 
-```xml
-android:icon="@mipmap/ic_launcher"
-android:roundIcon="@mipmap/ic_launcher_round"
+### 找不到 adb
+
+launcher 会按以下顺序查找 adb：
+
+1. 用户手动选择的 adb.exe（点击"选择 adb.exe"按钮指定）
+2. PATH 中的 adb
+3. `ANDROID_HOME/platform-tools/adb.exe`
+4. `ANDROID_SDK_ROOT/platform-tools/adb.exe`
+5. 项目根目录 `local.properties` 中的 `sdk.dir`
+6. 常见兜底路径：`D:\Android\Sdk`、`%LOCALAPPDATA%\Android\Sdk` 等
+
+如果 Android Studio 能安装 App 但 launcher 找不到 adb，通常是因为环境变量未设置。可以通过以下方式解决：
+
+**方式一：让 launcher 自动从 local.properties 查找**
+
+确保项目根目录存在 `local.properties`（Android Studio 会自动生成），内容示例：
+
+```properties
+sdk.dir=D\:\\Android\\Sdk
 ```
 
-然后重新安装 App。
+launcher 会自动解析这个路径，找到 `D:\Android\Sdk\platform-tools\adb.exe`。
+
+**方式二：手动选择 adb.exe**
+
+在 launcher 的 USB 数据线连接区域，点击"选择 adb.exe"按钮，手动定位到：
+
+```text
+D:\Android\Sdk\platform-tools\adb.exe
+```
+
+选择后，launcher 会优先使用手动选择的路径。
+
+### 手机 USB 模式报 127.0.0.1:8765 ECONNREFUSED
+
+通常是 adb reverse 未成功建立，或电脑端 server 未启动。可手动执行以下命令检查：
+
+```powershell
+$adb = "D:\Android\Sdk\platform-tools\adb.exe"
+& $adb devices
+& $adb reverse tcp:8765 tcp:8765
+& $adb reverse --list
+```
+
+确认输出包含 `UsbFfs tcp:8765 tcp:8765` 后再从手机连接。
+
+### unauthorized
+
+说明手机尚未授权 USB 调试。请查看手机屏幕上的授权弹窗，勾选允许后重新点击"一键配置 USB 连接"。
+
+### offline
+
+说明设备离线。请重新插拔数据线，确认 USB 调试已开启，然后重新查看 ADB 设备。
+
+### 数据线只充电不传数据
+
+更换支持数据传输的数据线，或在手机 USB 连接选项中选择文件传输/数据传输相关模式。
+
+### 电脑端服务未启动
+
+无论 LAN 还是 USB 模式，都需要先启动 `server.py`。请在 launcher 中点击“启动服务”。
+
+### 手机端仍选了局域网模式
+
+USB reverse 配置成功后，手机端还需要点击“修改”，选择“USB 数据线”，再点击“连接”。
+
+### LAN 连接失败
+
+请检查手机和电脑是否在同一 Wi-Fi、Windows 防火墙是否允许 Python 通信、手机端 IP 是否填写为电脑端显示的局域网 IP、端口是否为 `8765`。
 
 ## 注意事项
 
-* PhoneType 当前版本基于局域网 TCP，不是蓝牙 HID 键盘。
+* USB 数据线模式依赖 adb、USB 调试授权和 `adb reverse`，不是原生 USB HID。
+* 蓝牙、BLE、Android 原生 USB Host / Accessory 均未实现。
 * PhoneType 不能读取电脑当前输入框内容，只能向电脑当前焦点发送文本或键盘事件。
 * “退格”“Delete”“方向键”“复制”“剪切”等操作都作用于电脑当前焦点窗口。
 * 使用前请确认电脑当前焦点位于目标输入框中。
-* 本项目适合个人局域网环境使用，不建议暴露到公网。
-
-## 下载
-
-可在 GitHub Releases 页面下载：
-
-- `PhoneType-v1.0.0-debug.apk`：Android 手机端
-- `PhoneTypePC-v1.0.0.zip`：Windows 电脑端监听器
+* LAN 模式适合个人局域网环境使用，不建议暴露到公网。
+* Windows 安全软件可能拦截 Python 模拟键盘输入。

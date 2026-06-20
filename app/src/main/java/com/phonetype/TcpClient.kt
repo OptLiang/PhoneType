@@ -11,11 +11,6 @@ import java.io.OutputStreamWriter
 import java.net.InetSocketAddress
 import java.net.Socket
 
-data class SendResult(
-    val ok: Boolean,
-    val message: String
-)
-
 object TcpClient {
     suspend fun sendText(
         host: String,

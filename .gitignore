@@ -1,15 +1,28 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+﻿# Android / Gradle build
+.gradle/
+.gradle-user-home/
+build/
+app/build/
+
+# Local machine config
 local.properties
+
+# IDE local files
+.idea/
+*.iml
+
+# Python cache
+*pycache*/
+*.pyc
+*.pyo
+
+# Logs / temp
+*.log
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Release package folder
+PhoneType*release*v2.0/

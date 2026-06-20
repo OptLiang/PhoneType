@@ -9,7 +9,7 @@ from pynput.keyboard import Controller, Key
 
 HOST = "0.0.0.0"
 PORT = 8765
-SERVER_VERSION = "v1.0-final"
+SERVER_VERSION = "v2.0"
 
 paste_lock = threading.Lock()
 keyboard = Controller()
@@ -49,6 +49,10 @@ SUPPORTED_SHORTCUTS = {
     ("shift", "enter"),
     ("win", "shift", "s"),
 }
+
+
+def log(message):
+    print(message, flush=True)
 
 
 def get_lan_ip():
@@ -118,59 +122,68 @@ def format_shortcut(keys):
 
 class PhoneTypeRequestHandler(socketserver.StreamRequestHandler):
     def handle(self):
-        for raw_line in self.rfile:
-            try:
-                line = raw_line.decode("utf-8").strip()
-                if not line:
-                    send_response(self.wfile, False, "empty message")
-                    continue
-
-                data = json.loads(line)
-                message_type = data.get("type")
-
-                if message_type == "ping":
-                    send_response(self.wfile, True, "pong")
-                    continue
-
-                if message_type == "key":
-                    key_name = str(data.get("key", "")).lower()
-                    if not press_single_key(key_name):
-                        send_response(self.wfile, False, f"unsupported key: {key_name}")
+        client = f"{self.client_address[0]}:{self.client_address[1]}"
+        log(f"client connected: {client}")
+        try:
+            for raw_line in self.rfile:
+                try:
+                    line = raw_line.decode("utf-8").strip()
+                    if not line:
+                        send_response(self.wfile, False, "empty message")
                         continue
 
-                    send_response(self.wfile, True, f"key:{key_name}")
-                    continue
+                    data = json.loads(line)
+                    message_type = data.get("type")
 
-                if message_type == "shortcut":
-                    raw_keys = data.get("keys")
-                    keys = [
-                        key.lower()
-                        for key in raw_keys
-                        if isinstance(key, str)
-                    ] if isinstance(raw_keys, list) else []
-                    shortcut_name = format_shortcut(keys if keys else raw_keys)
-
-                    if not keys or len(keys) != len(raw_keys) or not press_shortcut(keys):
-                        send_response(self.wfile, False, f"unsupported shortcut: {shortcut_name}")
+                    if message_type == "ping":
+                        log("request ping")
+                        send_response(self.wfile, True, "pong")
                         continue
 
-                    send_response(self.wfile, True, f"shortcut:{shortcut_name}")
-                    continue
+                    if message_type == "key":
+                        key_name = str(data.get("key", "")).lower()
+                        log(f"request key:{key_name}")
+                        if not press_single_key(key_name):
+                            send_response(self.wfile, False, f"unsupported key: {key_name}")
+                            continue
 
-                if message_type != "text":
-                    send_response(self.wfile, False, "unsupported message type")
-                    continue
+                        send_response(self.wfile, True, f"key:{key_name}")
+                        continue
 
-                text = data.get("text")
-                if not isinstance(text, str):
-                    send_response(self.wfile, False, "text must be a string")
-                    continue
+                    if message_type == "shortcut":
+                        raw_keys = data.get("keys")
+                        keys = [
+                            key.lower()
+                            for key in raw_keys
+                            if isinstance(key, str)
+                        ] if isinstance(raw_keys, list) else []
+                        shortcut_name = format_shortcut(keys if keys else raw_keys)
+                        log(f"request shortcut:{shortcut_name}")
 
-                enter = bool(data.get("enter", False))
-                paste_text(text, enter)
-                send_response(self.wfile, True, "inserted")
-            except Exception as error:
-                send_response(self.wfile, False, str(error) or error.__class__.__name__)
+                        if not keys or len(keys) != len(raw_keys) or not press_shortcut(keys):
+                            send_response(self.wfile, False, f"unsupported shortcut: {shortcut_name}")
+                            continue
+
+                        send_response(self.wfile, True, f"shortcut:{shortcut_name}")
+                        continue
+
+                    if message_type != "text":
+                        send_response(self.wfile, False, "unsupported message type")
+                        continue
+
+                    text = data.get("text")
+                    if not isinstance(text, str):
+                        send_response(self.wfile, False, "text must be a string")
+                        continue
+
+                    enter = bool(data.get("enter", False))
+                    log(f"request text length={len(text)} enter={str(enter).lower()}")
+                    paste_text(text, enter)
+                    send_response(self.wfile, True, "inserted")
+                except Exception as error:
+                    send_response(self.wfile, False, str(error) or error.__class__.__name__)
+        finally:
+            log(f"client disconnected: {client}")
 
 
 class ThreadingTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
@@ -179,16 +192,18 @@ class ThreadingTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 
 
 def main():
-    print(f"PhoneTypePC version: {SERVER_VERSION}", flush=True)
-    print(f"PhoneTypePC TCP server listening on {HOST}:{PORT}", flush=True)
-    print(f"LAN address: {get_lan_ip()}:{PORT}", flush=True)
-    print("Protocol: JSON Lines, one JSON object per line.", flush=True)
+    log(f"PhoneTypePC version: {SERVER_VERSION}")
+    log(f"PhoneTypePC TCP server listening on {HOST}:{PORT}")
+    log(f"LAN address: {get_lan_ip()}:{PORT}")
+    log("LAN TCP ready.")
+    log(f"USB ADB reverse should connect through 127.0.0.1:{PORT}.")
+    log("Protocol: JSON Lines, one JSON object per line; clients may keep one TCP connection open.")
 
     with ThreadingTCPServer((HOST, PORT), PhoneTypeRequestHandler) as server:
         try:
             server.serve_forever()
         except KeyboardInterrupt:
-            print("\nPhoneTypePC TCP server stopped.", flush=True)
+            log("\nPhoneTypePC TCP server stopped.")
 
 
 if __name__ == "__main__":
